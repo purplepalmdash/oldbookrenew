@@ -48,11 +48,14 @@ export PADDLEOCR_MCP_VENV_BIN=<PADDLEOCR_HOME>/venv/bin
 ```
 
 环境细节（MCP 注册、iGPU/OpenVINO 加速、CPU 回退、远程 GPU）见
-`skills/paddleocr-digitize/references/mcp-setup.md`。
+`skills/paddleocr-digitize/references/mcp-setup.md`；**硬件/系统要求分档**
+（最低配置、核显加速、Scribus 是否必需、验证环境清单）见 [`HARDWARE.md`](HARDWARE.md)。
 
 ## 目录结构
 
 ```
+README.md                # 本文件
+HARDWARE.md              # 硬件/系统要求分档（最低配置/核显加速/验证环境清单）
 skills/
 ├── paddleocr-digitize/
 │   ├── SKILL.md                 # 技能主体：门径、S1-S6 流水线、各阶段心得、事故手册
