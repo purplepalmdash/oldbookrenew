@@ -12,10 +12,14 @@ Modes (MCP venv python, resident MCP server stopped, as with 08):
                      score < rescue.score_threshold and rescue those pages
   40 87              rescue the given pages explicitly
   --check [pages]    book-level strip audit (S4.5): re-OCR every text
-                     band, difflib-compare against the typeset dataset,
-                     flag pages with any line ratio < rescue.check_ratio.
-                     REPORT ONLY — then rescue the flagged pages and
-                     rerun run_page.py.
+                     band, difflib-compare against the typeset dataset
+                     (each dataset line also scored against concatenations
+                     of up to 2 ADJACENT fresh lines, and as a neighbor-
+                     concat — rescue OCR splits/merges lines; ds->got only,
+                     so intentionally-dropped watermark/out-of-frame lines
+                     in the fresh OCR don't false-flag), flag pages with
+                     any line ratio < rescue.check_ratio. REPORT ONLY —
+                     then rescue the flagged pages and rerun run_page.py.
 
 Rescue recipe (A/B'd in the source skill: plain percentile stretch +
 upsample beats Otsu — which kills light ink entirely — and CLAHE, and it
@@ -192,6 +196,45 @@ async def rescue_page(page: int, force: bool = False) -> dict:
     return rep
 
 
+def line_audit_ratio(ds_lines: list, got_lines: list) -> float:
+    """Worst per-line difflib ratio of the typeset dataset lines against the
+    fresh OCR lines, tolerant to block SPLIT / MERGE (ds -> got only).
+
+    Rescue OCR re-segments the strip: a dataset line may come back as two
+    blocks (SPLIT) and two dataset lines may merge into one block (MERGE);
+    plain per-line best-match scores those ~0.5-0.8 and false-flags the
+    page. So each dataset line is scored against the fresh lines AND
+    concatenations of up to 2 adjacent fresh lines (split tolerance), and
+    the dataset line itself is also scored as a concat with its neighbor
+    (merge tolerance).
+
+    ds -> got only, NOT got -> ds: the fresh strip OCR legitimately sees
+    lines the dataset intentionally DROPS (a scan-time watermark slogan, an
+    out-of-frame low-confidence block filtered by 04_merge); scoring the
+    extra got lines would false-flag exactly the watermark pages this audit
+    exists to serve. (A genuinely missing content line in the dataset is
+    caught downstream by 06_verify, not here.) Greedy neighborhood
+    allowance, not full sequence alignment (a 3-way split can still flag —
+    harmless: rescue is idempotent). Returns the min over dataset lines;
+    1.0 when the dataset has no lines.
+    """
+    def pairs(lines):
+        return [lines[i] + lines[i + 1] for i in range(len(lines) - 1)]
+
+    if not ds_lines:
+        return 1.0
+    got_c = got_lines + pairs(got_lines)  # split tolerance
+    worst = 1.0
+    for i, t in enumerate(ds_lines):
+        nxt = ds_lines[i + 1] if i + 1 < len(ds_lines) else ""
+        prv = ds_lines[i - 1] if i > 0 else ""
+        ext = [t, t + nxt, prv + t]  # merge tolerance
+        best = max((difflib.SequenceMatcher(None, x, y).ratio()
+                    for x in ext for y in got_c), default=0.0)
+        worst = min(worst, best)
+    return worst
+
+
 async def check_pages(pages) -> list:
     """S4.5 book-level strip audit: re-OCR strips, difflib vs dataset."""
     flagged = []
@@ -208,18 +251,11 @@ async def check_pages(pages) -> list:
             print(f"CHECK p{p:03d} OCR FAIL {e}", flush=True)
             continue
         got = [(b.get("text") or "").strip() for b in fresh.get("blocks", [])]
-        worst, worst_pair = 1.0, None
-        for t in ds_lines:
-            best = max((difflib.SequenceMatcher(None, t, g).ratio()
-                        for g in got), default=0.0)
-            if best < worst:
-                worst, worst_pair = best, (t, best)
+        worst = line_audit_ratio(ds_lines, got)
         status = "ok" if worst >= CHECK_RATIO else "FLAG"
         if worst < CHECK_RATIO:
             flagged.append(p)
-        print(f"CHECK p{p:03d} {status} worst={worst:.2f} "
-              f"{'| '.join(worst_pair) if worst_pair and status=='FLAG' else ''}",
-              flush=True)
+        print(f"CHECK p{p:03d} {status} worst={worst:.2f}", flush=True)
     return flagged
 
 

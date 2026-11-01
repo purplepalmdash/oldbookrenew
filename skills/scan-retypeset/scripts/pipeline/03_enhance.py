@@ -255,10 +255,29 @@ def crop_margin_strip(deskew: Image.Image, geo: dict, side: str = "right"):
         strip = rgb[:, max(0, x0):]
         box = [max(0, x0), 0, w, h]
     # auto-detect: skip blank margins (no design, no ink and no saturated
-    # color) so the feature is generic across books and sides
+    # color) so the feature is generic across books and sides.
+    # Two keep-signals (either one keeps the strip):
+    #  (a) area rule: >= 0.5% dark or >= 0.1% reddish (the historic rule);
+    #  (b) thin full-height edge line: a narrow run (<= 10 px) of columns
+    #      that are dark for >= 80% of the strip height. A 1-2 px printed
+    #      page-edge line on a wide margin is only ~0.3-0.5% of the strip
+    #      AREA and slips under (a) — detect it by column projection
+    #      rather than scaling the area threshold down, which would
+    #      false-positive on speckle in wide blank margins.
     g = strip.mean(axis=2)
     reddish = (strip[..., 0].astype(int) - strip[..., 1].astype(int) > 40)
-    if (g < 140).mean() < 0.005 and reddish.mean() < 0.001:
+    dark = g < 140
+    col_dark = dark.mean(axis=0)
+    thin_line, run = False, 0
+    for c in range(strip.shape[1] + 1):  # +1: sentinel closes last run
+        is_line = c < strip.shape[1] and col_dark[c] >= 0.80
+        if is_line:
+            run += 1
+        else:
+            if 1 <= run <= 10:
+                thin_line = True
+            run = 0
+    if (dark.mean() < 0.005 and reddish.mean() < 0.001 and not thin_line):
         return None, box
     k = max(51, (strip.shape[0] // 20) | 1)
     out = np.empty_like(strip)

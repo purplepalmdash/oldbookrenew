@@ -31,7 +31,7 @@ LLM 在线 → `guji-restore`。三技能可混用：主流程跑一条，疑难
 
 | 书 | 页数 | 技能 | 要点 |
 |---|---|---|---|
-| 龙子太郎（河北美术 1984） | 139 | 两条技能都跑过 | vector 变体基准书；右栏 running design 保真 |
+| 龙子太郎（河北美术 1984） | 139 | 两条技能都跑过 | vector 变体基准书；右侧装饰条在插图框内（figure crop 保留，无框外页边设计） |
 | 哪吒 | 70 | scan-retypeset | 左栏 running design、藏书印、~12 min 无人值守 |
 | 巴黎圣母院（半色调木刻） | 213 | 两条技能都跑过 | dot 编号、无号页、整版底图；whiten 保网点 |
 | 孙膑和庞涓（数字扫描） | 114 | paddleocr-digitize | Scribus MCP 路线（.sla）、条带权威重识别 |

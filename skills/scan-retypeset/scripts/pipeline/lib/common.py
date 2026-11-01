@@ -433,9 +433,16 @@ def weighted_gaps(text: str, font_name: str, pt: float, extra: float,
     proportional to its ADVANCE (slot_i ∝ adv_i) — uniform tracking gives
     narrow digits the same gaps as CJK characters, so mixed lines like
     "共 156 页" visibly over-space the digits.  Weighting the gap between
-    two characters by the mean of their advances is exactly equivalent to
-    slot ∝ advance, and degenerates to uniform tracking for pure
-    full-width lines (the historical behavior).
+    two characters by the mean of their advances reproduces slot ∝ advance
+    up to a half-slot at each line end: the strict slot model leaves
+    (adv_first + adv_last)/2 of the extra space at the line edges (inside
+    the end characters' slots), whereas here that amount is folded into
+    the inter-character gaps so the gaps sum EXACTLY to `extra` and the
+    line spans the target width by construction. The difference is ~1+
+    O(end_adv/total_adv) on each gap — a few percent on short lines,
+    invisible in print. For pure full-width lines the weights are all
+    equal, so it degenerates to uniform tracking (the historical
+    behavior).
 
     Returns len(text)-1 gaps in pt that sum to `extra` (unless clipped by
     `cap`, which only bites on very wide original spacing).  All zeros

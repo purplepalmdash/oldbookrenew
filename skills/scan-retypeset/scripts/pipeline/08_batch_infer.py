@@ -14,6 +14,12 @@ Config keys (pipeline/config.json):
 
 Results -> data/vl/pNNN.json, data/ocr/pNNN.json.
 Skip logic: pages whose output already exists are not re-run.
+Failure visibility: a page that fails (and fails its one automatic
+retry) leaves a marker `data/<vl|ocr>/pNNN.failed` with the exception
+string, and the phase summary prints `== <PHASE> FAILED pages: [...]` —
+so an unattended batch reports its holes instead of surfacing them
+hours later as FileNotFoundError in 04/05. run_page.py fails fast with
+a clear message when it hits a marker.
 NOTE: stop the resident MCP server process before running (single GPU:
 two resident model sets may OOM); restart it afterwards.
 """
@@ -34,9 +40,46 @@ VL_DIR = ROOT / "data" / "vl"
 OCR_DIR = ROOT / "data" / "ocr"
 
 
-def existing_pages():
+def panel_pages_with_render():
+    """Panel pages that HAVE a render (data/pages/pNNN.png) — i.e. the
+    pages this batch can process. (Name is what it returns: the
+    to-process set, not "already done" pages.)"""
     return [p for p in PANEL_PAGES
             if (ROOT / "data" / "pages" / f"p{p:03d}.png").exists()]
+
+
+def _record_failure(phase_dir: Path, page: int, exc: Exception):
+    phase_dir.mkdir(parents=True, exist_ok=True)
+    (phase_dir / f"p{page:03d}.failed").write_text(
+        f"{type(exc).__name__}: {exc}\n{time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+
+
+def _clear_failure(phase_dir: Path, page: int):
+    f = phase_dir / f"p{page:03d}.failed"
+    if f.exists():
+        f.unlink()
+
+
+async def _infer(name: str, out_dir: Path, page: int, call) -> bool:
+    """One inference attempt for one page. Writes the result json (and
+    clears any stale pNNN.failed marker) on success; writes/keeps the
+    marker on failure. `call(page)` must return an object with
+    .model_dump()."""
+    out = out_dir / f"p{page:03d}.json"
+    t = time.time()
+    try:
+        res = await call(page)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(res.model_dump(), ensure_ascii=False,
+                                  indent=1))
+        _clear_failure(out_dir, page)
+        print(f"{name:<9} p{page:03d} ok {time.time()-t:6.1f}s", flush=True)
+        return True
+    except Exception as e:
+        print(f"{name:<9} p{page:03d} FAIL {type(e).__name__}: {e}",
+              flush=True)
+        _record_failure(out_dir, page, e)
+        return False
 
 
 def ensure_textband(page: int):
@@ -67,35 +110,36 @@ def ensure_textband(page: int):
 
 async def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "all"
-    pages = existing_pages()
+    pages = panel_pages_with_render()
     print(f"pages={len(pages)} mode={mode} device={getattr(srv, 'DEVICE', '?')}",
           flush=True)
     if mode in ("vl", "all"):
         t0 = time.time()
-        n = 0
+        n, failed = 0, []
         for i, p in enumerate(pages):
-            out = VL_DIR / f"p{p:03d}.json"
-            if out.exists():
+            if (VL_DIR / f"p{p:03d}.json").exists():
                 continue
-            t = time.time()
-            try:
-                res = await srv._tool_parse(
-                    str(ROOT / "data" / "pages" / f"p{p:03d}.png"))
-                out.parent.mkdir(parents=True, exist_ok=True)
-                out.write_text(json.dumps(res.model_dump(),
-                                          ensure_ascii=False, indent=1))
+            call = (lambda pg=p: srv._tool_parse(
+                str(ROOT / "data" / "pages" / f"p{pg:03d}.png")))
+            if await _infer(f"VL ({i+1}/{len(pages)})", VL_DIR, p, call):
                 n += 1
-                print(f"VL  p{p:03d} ok {time.time()-t:6.1f}s  ({i+1}/{len(pages)})",
-                      flush=True)
-            except Exception as e:
-                print(f"VL  p{p:03d} FAIL {type(e).__name__}: {e}", flush=True)
+            else:
+                # one automatic retry: transient GPU errors (OOM, driver
+                # drop) very often succeed immediately on a second try
+                await asyncio.sleep(5)
+                if await _infer(f"VL retry ({i+1}/{len(pages)})", VL_DIR, p, call):
+                    n += 1
+                else:
+                    failed.append(p)
         print(f"VL phase done: {n} pages in {time.time()-t0:.0f}s", flush=True)
+        print(f"== VL FAILED pages: {failed or 'none'}" + (
+            f"  (markers: {VL_DIR}/pNNN.failed)" if failed else ""),
+            flush=True)
     if mode in ("ocr", "all"):
         t0 = time.time()
-        done = 0
+        done, failed = 0, []
         for p in pages:
-            out = OCR_DIR / f"p{p:03d}.json"
-            if out.exists():
+            if (OCR_DIR / f"p{p:03d}.json").exists():
                 continue
             try:
                 crop = ensure_textband(p)
@@ -105,19 +149,21 @@ async def main():
             if crop is None:
                 print(f"OCR p{p:03d} SKIP no text_band_union in geo", flush=True)
                 continue
-            t = time.time()
-            try:
-                res = await srv._tool_ocr(str(crop), MCP.get("ocr_language", "ch"))
-                out.parent.mkdir(parents=True, exist_ok=True)
-                out.write_text(json.dumps(res.model_dump(),
-                                          ensure_ascii=False, indent=1))
+            call = (lambda pg=p: srv._tool_ocr(str(crop),
+                                               MCP.get("ocr_language", "ch")))
+            if await _infer(f"OCR ({done+1})", OCR_DIR, p, call):
                 done += 1
-                print(f"OCR p{p:03d} ok {time.time()-t:5.1f}s  ({done})",
-                      flush=True)
-            except Exception as e:
-                print(f"OCR p{p:03d} FAIL {type(e).__name__}: {e}", flush=True)
+            else:
+                await asyncio.sleep(5)
+                if await _infer(f"OCR retry ({done+1})", OCR_DIR, p, call):
+                    done += 1
+                else:
+                    failed.append(p)
         print(f"OCR phase done: {done} pages in {time.time()-t0:.0f}s",
               flush=True)
+        print(f"== OCR FAILED pages: {failed or 'none'}" + (
+            f"  (markers: {OCR_DIR}/pNNN.failed)" if failed else ""),
+            flush=True)
 
 
 if __name__ == "__main__":

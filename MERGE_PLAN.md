@@ -27,6 +27,19 @@
   两处确认：A4 天岸马判定已改按本技能水印子技能框架留证据（bread 已认
   "出版社装饰文字"为误标）；A6 来源引用准确（`references/pitfalls.md` 已有
   1920 预处理坐标系条目，代码侧 `MAX_OCR_SIDE` 注释同在）。
+- **bread 代码审查已响应（`review_issues_scan-retypeset.md`，6 项全修；**
+  详见 CHANGELOG 0.7.0 "bread-branch review fixes"）：
+  I-1 批量失败页可见性（`== <PHASE> FAILED pages` + `pNNN.failed` 标记
+  + 一轮自动重试 + run_page 快速报错；`existing_pages` 改名）；
+  I-2 check 拆合行假报（`line_audit_ratio` ds→got 单向 + 邻接拼接容忍，
+  单调放宽不新增假报；验证中发现并规避了 got 侧多水印行会新造假报的
+  陷阱，刘秀下 p40-44 实测 0/5）；I-3 细边线漏检（列投影窄暗列检测，
+  哪吒 134 页 + 024 316 页-侧 A/B 零差异，合成 6 例全对；"找只有细
+  边线的真书验证" 登记为后续跟踪项）；I-4 docstring 措辞（"exactly
+  equivalent" → 行端半 slot 差异）；I-5 numpy import 位置；I-6
+  install.sh 不再静默覆盖有本地修改的目录（--force/交互/非交互 skip+exit 2，
+  顺带修了参数循环的 set -u 隐患）。README 龙子太郎行改为"右侧装饰条
+  在框内"。跟踪项（B2 ±14pt 逐字定位版）双方均已登记，不阻塞。
 - **第 7 节已核事实交叉核对一致**：margin_strip 动机案例即哪吒（本技能
   CHANGELOG 0.3.0 与 examples 一致，仅 `nezha/config.json` 开 `margin_strip`）；
   龙子太郎右侧装饰条在框内、不入页边设计层。天岸马=扫描期叠加，删除动作

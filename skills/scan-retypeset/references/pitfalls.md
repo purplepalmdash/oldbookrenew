@@ -529,3 +529,15 @@ rsvg round-trip to verify losslessness — expect equal counts.)
     lexicon and apply it AFTER all OCR + rescue and BEFORE typeset;
     then re-verify PDF text counts before finalizing (a cached plan /
     stale dataset will silently undo the fix otherwise).
+41. **A thin full-height page-edge line can be missed by an AREA-ratio
+    margin auto-detect.** `crop_margin_strip` skips a margin when its
+    dark-pixel AREA < 0.5%. On a wide margin a 1-2px printed edge line is
+    only ~1/300≈0.33% (or 2/400=0.5%) of the strip area — right at/under
+    the threshold — so a margin whose ONLY design element is that line
+    gets skipped. Detect it by COLUMN PROJECTION (a narrow <=10px run of
+    columns each dark for >=80% of the strip height) as a second keep-
+    signal, rather than scaling the area threshold by strip width (which
+    false-positives on speckle in wide blank margins). (Strong-signal
+    books like 哪吒 — running-title tab + red seal — have plenty of area
+    and never hit this edge; verify the thin-line case on a book whose
+    only margin element is an edge line.)

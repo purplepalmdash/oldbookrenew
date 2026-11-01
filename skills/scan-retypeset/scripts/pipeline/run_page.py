@@ -9,11 +9,13 @@ Steps: 03_enhance -> 04_merge -> 05_typeset -> 06_verify -> preview compare.
 Usage: .venv/bin/python pipeline/run_page.py --page 10
 """
 import argparse
+import glob
 import subprocess
 import sys
 from pathlib import Path
 
 import cv2
+import numpy as np
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -40,7 +42,6 @@ def make_preview(page: int):
     if r.returncode != 0:
         print("preview render failed:", r.stderr, file=sys.stderr)
         return
-    import glob
     files = glob.glob(f"/tmp/prev_p{page:03d}*.png")
     if not files:
         print("preview: no render produced", file=sys.stderr)
@@ -60,11 +61,27 @@ def make_preview(page: int):
     combo.save(ROOT / "out" / "preview" / f"p{page:03d}_compare.png")
     print("preview:", ROOT / "out" / "preview" / f"p{page:03d}_compare.png")
 
+def check_infer_markers(page: int):
+    """08_batch_infer leaves a data/<vl|ocr>/pNNN.failed marker on pages
+    whose GPU inference failed (even after its automatic retry). Fail
+    fast with a clear message instead of a bare FileNotFoundError deep
+    in 04/05."""
+    for name in ("vl", "ocr"):
+        marker = ROOT / "data" / name / f"p{page:03d}.failed"
+        out = ROOT / "data" / name / f"p{page:03d}.json"
+        if marker.exists() and not out.exists():
+            first = marker.read_text().strip().splitlines()[0]
+            print(f"p{page:03d}: {name} inference failed ({first}) — "
+                  f"re-run 08_batch_infer.py {name}", file=sys.stderr)
+            raise SystemExit(1)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--page", type=int, required=True)
     args = ap.parse_args()
     page = args.page
+    check_infer_markers(page)
     base = Path(__file__).resolve().parent
     sh(PY, str(base / "03_enhance.py"), "--page", str(page))
     sh(PY, str(base / "04_merge.py"), "--page", str(page))
@@ -74,5 +91,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import numpy as np  # noqa: F401
     main()

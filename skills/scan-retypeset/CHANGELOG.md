@@ -59,6 +59,45 @@ reading their 刘秀/孙膑/巴黎圣母院 runs:
   (name/description/compatibility/metadata — loads cleanly under both
   pi and Claude Code loaders), workflow step 5b (rescue), `data/rescue/`
   in the output layout, `pymupdf` in prerequisites.
+- **bread-branch review fixes** (issues I-1…I-6, `review_issues_scan-retypeset.md`):
+  - `08_batch_infer` now prints `== <PHASE> FAILED pages: [...]` per
+    phase, leaves a `data/<vl|ocr>/pNNN.failed` marker (exception string)
+    on pages that fail even after one automatic retry, and `run_page.py`
+    fails fast with a clear "re-run 08 <phase>" message instead of a
+    downstream `FileNotFoundError`. `existing_pages()` renamed
+    `panel_pages_with_render()` (it returns the to-PROCESS set).
+  - `09_rescue --check` line audit now scores each dataset line against
+    the fresh lines AND concatenations of up to 2 ADJACENT fresh lines
+    (split tolerance), with the dataset line itself also scored as a
+    neighbor-concat (merge tolerance) — rescue OCR splits/merges lines,
+    which plain per-line best-match false-flagged at 0.5-0.8. Scoring is
+    ds->got ONLY: the fresh strip OCR legitimately sees lines the dataset
+    intentionally drops (watermark slogan, out-of-frame junk), and
+    scoring the extra got lines would false-flag exactly the watermark
+    pages (caught on 刘秀 下册 p40-44 during validation). The candidate
+    set is a strict superset of the old per-line best-match, so the
+    metric can only get more lenient — no new false flags possible.
+    Extracted as `line_audit_ratio()`, report-only semantics unchanged.
+  - `03_enhance.crop_margin_strip` keeps a strip when EITHER the area
+    rule (>=0.5% dark / >=0.1% red) OR a thin full-height dark column
+    run (<=10px, >=80% of height dark) is present — a 1-2px printed
+    page-edge line on a wide margin is only ~0.3-0.5% of the strip AREA
+    and was missed by the area rule alone. Column projection, not a
+    scaled-down area threshold (which would false-positive on speckle).
+  - `weighted_gaps` docstring corrected: the mean-adjacent-advance gap
+    weighting reproduces slot∝advance up to a half-slot at each line
+    end (the end chars' outer half-slot has no gap to hold it, so the
+    gaps sum exactly to `extra` and the line spans the target width).
+  - `run_page.py` `import numpy as np` moved to the top (it was in the
+    `__main__` guard, an implicit global dependency of `make_preview`).
+  - `install.sh` (root + per-skill) no longer silently `rm -rf`s an
+    existing skill dir that DIFFERS from the repo copy (local edits): 
+    identical→quiet replace, differing→needs `--force` (or `y` on a
+    TTY); non-interactive skip exits 2. (Catches a latent `set -u`
+    bug in the arg loop too.)
+  - Root README 龙子太郎 row: its right-side decorative bar sits INSIDE
+    the frame (kept by figure crop), not an out-of-frame margin running
+    design — margin_strip's motivating case remains 哪吒 only.
 
 ## 0.6.2 (2026-11-01)
 
