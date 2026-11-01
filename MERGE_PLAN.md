@@ -3,6 +3,36 @@
 状态：**执行中**（bread 起草于 2026-11-01；test-mc12le000 侧已执行大半，
 进度注记见下。本文件由 bread 分支推送，现取回 main 随整合推进更新。）
 
+## 0a. 执行状态注记（bread，2026-11-01）
+
+- **A 项清单 6/6 完成**（直接落在 main 的 paddleocr-digitize 内，v1.3；
+  A7 已由 test-mc12le000 自完成于根 HARDWARE.md）：
+  - A1 → `scripts/erase_template.py`（模板反混合移植；乘性吸墨合成测试：
+    红底 171→179 真值 180、暗画 116→120 真值 120，框外像素级不变）；
+  - A2 → `build_pdf.py --gs`（**带文字层回归门**：抽 3 页比对提取文本，
+    失败自动弃 gs 版。实测 gs 10.02.1 对 CID TrueType 子集损坏 ToUnicode
+    映射 → 本机自动中止，保原 PDF；新入事故手册两条：gs 文字层损坏、
+    1-bit 图转 JPEG 膨胀 43.7→91.2MB）；
+  - A3（缩窄为检测器）→ `scripts/margin_ink_check.py`（S5 前置框外墨门：
+    Otsu − 插图框(外扩10px) − 行 quad 外扩 − book.json 已判定区；WARN
+    退出码 1 + 高亮图。刘秀下 20 页实测：抓出天岸马水印区+2 处扫描噪声带
+    → 判定记录后 0 WARN；合成右页边签条 14067px 必中）；
+  - A4 → SKILL 水印判定子技能（整书重复行→模板 recall→姊妹卷对照→
+    留证据处置；天岸马改判案例并入几何清除节）；
+  - A5 → `scripts/probe_baseline.py` + `build_pdf.py --ink-top`（整行墨顶
+    实测：LXGW 字体墨顶 0.80 vs 验证常数 0.88，差 = det quad 顶 padding
+    ~0.08em——换字体用 Δ 相对校正；默认 0.88 不动，回归验证：刘秀下
+    重构建 162 页全页文字层+抽样 4 页 0.1pt 位置全等）；
+  - A6 → 事故手册 OCR bbox 1920 预处理坐标系条目（引用 scan-retypeset
+    pitfalls 同条目）。
+- 验证：9 个 CLI 脚本 py_compile+--help 全过；新文件敏感信息 0 命中；
+  默认行为零漂移（--ink-top/--gs 均 opt-in，无参重建与 shipped 逐页一致）。
+- 待办（案例驱动）：A1 真书案例（彩色图扫描期水印 + 无 T4）；A2 换 gs
+  版本重试（找到能保 ToUnicode 的 gs 后可启用真减容）；细边线真书验证
+  （与 test-mc12le000 的 I-3 跟踪项同源）。
+
+---
+
 ## 0. 执行状态注记（test-mc12le000，2026-11-01）
 
 - **整合分支 = `main`**（c609691）：已基于 bread HEAD 301ff6a 重构为

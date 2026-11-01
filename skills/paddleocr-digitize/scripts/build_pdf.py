@@ -14,11 +14,18 @@
 彩色行（special JSON 中 "color": "red"）用独立 TextWriter + color。
 
 用法: build_pdf.py --src book.pdf --out digitize [--font /path/to/CJK.ttf]
-      [--page-size 842 595] [--title 书名]
+      [--page-size 842 595] [--title 书名] [--ink-top 0.88] [--gs]
+
+--ink-top: 基线=行顶+该值×字号（默认 0.88，刘秀双书验证值；换字体/扫描
+  风格先用 probe_baseline.py 实测再传此参数）。
+--gs: 保存后用 Ghostscript 终优化（/prepress，208 页书可省数倍体积；
+  需系统装 gs，缺则报错。参数可用 --gs-args 覆盖）。
 """
 import argparse
 import json
+import shutil
 import statistics
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -38,8 +45,17 @@ def main():
     ap.add_argument("--page-size", nargs=2, type=float, default=[842.0, 595.0])
     ap.add_argument("--title", default=None)
     ap.add_argument("--jpeg-quality", type=int, default=0,
-                    help="插图重编码为 JPEG 灰度（0=保持 PNG；数字扫描书白化图建议 80-88，"
-                         "灰度网点 PNG 压缩率低，208 页可省 ~60%%）")
+                    help="插图重编码为 JPEG 灰度（0=保持 PNG；**仅适用灰度网点图**："
+                         "whiten 插图 80-88，巴黎案例 211 页 106→63MB。"
+                         "⚠ Otsu 1-bit 图不要开：实测 43.7→91.2MB 反而变大）")
+    ap.add_argument("--ink-top", type=float, default=0.88,
+                    help="基线=行顶+该值×字号（默认 0.88；换字体先用 "
+                         "probe_baseline.py 实测）")
+    ap.add_argument("--gs", action="store_true",
+                    help="保存后 Ghostscript 终优化（/prepress，减体积）")
+    ap.add_argument("--gs-args",
+                    default="-dCompatibilityLevel=1.5 -dPDFSETTINGS=/prepress",
+                    help=argparse.SUPPRESS)
     a = ap.parse_args()
 
     out = Path(a.out)
@@ -54,7 +70,7 @@ def main():
 
     FONT = fitz.Font(fontfile=a.font)
     PW, PH = a.page_size
-    INK_TOP, INK_CENTER = 0.88, 0.40
+    INK_TOP, INK_CENTER = a.ink_top, 0.40
 
     # 渲染几何（从第一个**标准** data JSON 读；special JSON 无 width 字段）
     first = next(f for f in sorted(data.glob("page*.json"))
@@ -231,6 +247,37 @@ def main():
     doc.subset_fonts()
     doc.save(str(out_pdf), garbage=4, deflate=True)
     print(f"saved {out_pdf} pages={len(doc)}")
+    if a.gs:
+        gs = shutil.which("gs")
+        if not gs:
+            raise SystemExit("--gs 需要系统安装 Ghostscript（gs）")
+        # 文字层回归门：抽 3 页比对 gs 前后提取文本。部分 gs 版本（实测
+        # 10.02.1）对 CID TrueType 子集重嵌会弄坏 ToUnicode 映射（字体表
+        # uni=yes 但提取出乱码）→ 检出即弃 gs 版、保原版，并提示改走
+        # --jpeg-quality 减容。宁可不压，不可交乱码文字层。
+        import random as _r
+        sample = _r.Random(7).sample(range(1, len(doc) + 1),
+                                     k=min(3, len(doc)))
+        before = [doc[p - 1].get_text() for p in sample]
+        tmp = out_pdf.with_suffix(".gs.pdf")
+        subprocess.run([gs, "-dBATCH", "-dNOPAUSE", "-dQUIET",
+                        "-sDEVICE=pdfwrite", a.gs_args,
+                        f"-sOutputFile={tmp}", str(out_pdf)], check=True)
+        after = None
+        try:
+            chk = fitz.open(str(tmp))
+            after = [chk[p - 1].get_text() for p in sample]
+            chk.close()
+        except Exception:
+            after = None
+        if after == before:
+            b_sz, a_sz = out_pdf.stat().st_size, tmp.stat().st_size
+            tmp.replace(out_pdf)
+            print(f"gs: {b_sz/1e6:.1f}MB -> {a_sz/1e6:.1f}MB")
+        else:
+            tmp.unlink(missing_ok=True)
+            print("gs: 文字层回归失败（此 gs 版本损坏 CJK 文字层映射，"
+                  "已弃用 gs 版、保留原 PDF）——减容改走 --jpeg-quality")
 
 
 if __name__ == "__main__":

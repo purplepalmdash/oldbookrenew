@@ -3,8 +3,8 @@ name: paddleocr-digitize
 description: "用 PaddleOCR MCP 把扫描版书刊（连环画/图画书/老杂志：带边框插图+字幕，泛黄、无文字层）数字化重排为可打印、文字可选取、坐标与原书严格一致的 PDF：逐页 JSON（layout 坐标+每行 quad 起止点）、插图边框水平对齐+Otsu 黑白化、低置信乱码字幕行救援（条带增强重识别）、竖排文字（90°旋转识别+逐字堆叠）、字符级逐页比对测试。与 guji-restore（LLM 识别/灰度保网点路线）互补：用户要求用 PaddleOCR/PaddleOCR MCP 识别、或要求纯黑白+严格原坐标重建、或书带边框插图+横排字幕时选本技能。"
 compatibility: "Python 3.10+ venv（pymupdf, opencv-python, numpy, mcp>=2.3, onnxruntime, onnxruntime-openvino, openvino）+ PaddleOCR MCP server（官方 paddleocr_mcp + 自建 layout_server.py，见 references/mcp-setup.md）+ 一个 CJK TTF 字体（LXGW WenKai）。国内镜像源 pip 安装。"
 metadata:
-  version: "1.2"
-  origin: "Distilled from the longzitailang project (139-page scanned lianhuanhua) + alibaba40 project (63-page, watermark/deskew/CPU-only, 2026-10) + liuxiu project (test3 上/下册 156+164 页双路线批量：白净→Scribus 两端对齐 slot，泛黄→build_pdf Otsu，2026-11)"
+  version: "1.3"
+  origin: "Distilled from the longzitailang project (139-page scanned lianhuanhua) + alibaba40 project (63-page, watermark/deskew/CPU-only, 2026-10) + liuxiu project (test3 上/下册 156+164 页双路线批量：白净→Scribus 两端对齐 slot，泛黄→build_pdf Otsu，2026-11) + oldbookrenew main 整合（2026-11：A 组吸收——erase_template 模板反混合 / build_pdf --gs Ghostscript 终优化 / --ink-top + probe_baseline 实测基线 / margin_ink_check 框外墨检测门 / 水印判定子技能）"
 ---
 
 # 扫描书刊数字化（paddleocr-digitize）
@@ -244,6 +244,17 @@ CPU ~30min/208 页@3x），与现有行 difflib 比对（ratio<0.9 标记）：
   - `--jpeg-quality N`：灰度图页（whiten 插图）重编码 JPEG 降体积
     （PNG 64MB/页 → JPEG q80 ~100KB/页，211 页 106MB→63MB，网点无损）。
     彩色图页自动跳过不重编码。
+  - `--gs`：保存后 Ghostscript 终优化 + **文字层回归门**（抽 3 页比对提取
+    文本；部分 gs 版本弄坏 CJK 子集 ToUnicode 映射时自动弃 gs 版、保原
+    PDF）。⚠ 实测 gs 10.02.1 对 CID TrueType 子集会损坏文字层（字体表
+    uni=yes 但提取出乱码）→ 该环境下 `--gs` 会自动中止；换 gs 版本/
+    `--gs-args` 后可再试。Otsu 黑白书**不要**用 `--jpeg-quality` 减容
+    （1-bit 图转 JPEG 反而变大：实测 43.7→91.2MB）——`--jpeg-quality`
+    只适用灰度网点图（whiten 插图，巴黎圣母院案例）。
+  - `--ink-top N`：基线常数（默认 0.88）。注意 0.88 = 字体墨顶 + det quad
+    顶 padding（LXGW 实测：0.80+0.08）；**换字体**时跑 `probe_baseline.py`
+    量新旧字体墨顶，用 Δ 相对校正（新常数 ≈ 0.88 + 新−旧），QA 基准页
+    确认；同字体同 det 不疑不动（双书 500+ 行 0 偏差实证）。
 - **文字**：PyMuPDF `fitz.Font(fontfile=LXGW TTF)` + `TextWriter`；
   保存前 `doc.subset_fonts()`（子集嵌入，体积 6-7MB/139页）。
 - **字号公式**（保证铺满原行）：
@@ -319,10 +330,16 @@ OCR 把表格拆成单元格框（每格一个 quad）。Scribus 路线重建：
 
 ## 出版社装饰文字/水印残留行的几何清除（刘秀下册 115 行）
 
-老书角落常有出版社装饰字（如左下“开张天岸马奇逸人中龙”），整本被 OCR
+老书角落常有固定文本行（如左下“开张天岸马奇逸人中龙”），整本被 OCR
 当字幕行。特征：**固定角落 + 每页相同文本** → 几何规则批量删：
 `x1<150 & x2≤300 & y1>1050`（2x 坐标，按该书实测），删前先按文本计数确认
 命中页与行数，删后重建 QA。不要逐页手删。
+
+**判定先于删除**（2026-11 天岸马案例改判）：刘秀下册的这行联语我们初判为
+“出版社装饰文字”，后按下方水印判定子技能复核——**姊妹卷（上册）同一扫描源
+无此标记 + 模板匹配 recall=1.0 → 应判为扫描期叠加水印，不是印书内容**。
+删除动作不变，但判定路径要留证据（整书重复行/模板 recall/姊妹卷对照）：
+“同书姊妹卷没有”是区分“印在书上”与“扫描时加上”的最硬证据。
 
 ## S5' Scribus MCP 重建路线（替代 build_pdf.py，2026-10 孙膑和庞涓 114 页验证）
 
@@ -443,16 +460,34 @@ OCR 把表格拆成单元格框（每格一个 quad）。Scribus 路线重建：
    （无框自动回退不旋转），存 `work/images/pageNNN_0.png`，几何写入
    special JSON 的 `image` 字段（build_pdf 按它放图）。
 
-## 水印处理（remove_watermark.py + Otsu）
+## 水印判定子技能（后加 vs 原书设计）—— 先判定再动手
 
-侦察时先判断水印形态：**白底上 D=1–9/255 的浅灰斜纹平铺文字**（网站水印）
-是最常见、也最好除的类型。分三类：
+任何“疑似水印”的重复元素（固定角文字/图案、平铺纹、页边印记），
+删除前先按证据链判定归属，**判定结果写进 book.json 或报告**：
+
+1. **整书扫描**：OCR 全页，找“固定角落 + 每页相同”的短行/图案（OCR 重复行
+   是最便宜的第一信号；图案类用人眼过一遍接触印样）。
+2. **模板匹配**：取一页上该元素的 ROI，与其余页同位置互相关——
+   **像素一致（recall≈1.0）→ 扫描期叠加**（scanner 空间固定覆盖层）；
+   每页略有差异（纸质倾斜/打印批次）→ 更可能是印书内容。
+3. **姊妹卷/同系列对照**（最硬证据）：同书姊妹卷、同扫描源无此元素
+   → 不可能是印书内容（否则两卷都该有）→ 扫描期叠加。刘秀天岸马即
+   以此改判。
+4. **处置**：判为后加 → 默认去除 + 向用户报告证据；判为原书设计 →
+   保留（页边设计则见 margin_ink_check 门与 S5 special_pages）；
+   拿不准 → 报告两边证据让用户定。
+
+## 水印处理（remove_watermark.py + Otsu + erase_template.py）
+
+侦察时先判断水印形态（先跑上面的判定子技能定归属）：**白底上 D=1–9/255
+的浅灰斜纹平铺文字**（网站水印）是最常见、也最好除的类型。分四类：
 
 1. **B&W 正文页（插图+字幕）**：不需要专门去水印步骤——S3 的**全局 Otsu
    天然把 D≤9 的浅灰归入背景**（直方图双峰：墨 0–7 / 背景 252–255，水印
    落在背景峰内）。验证：3x 渲染下二值图内无水印纹理。
 2. **纯水印页**（整页只有水印+广告文字）：book.json `drop_pages` 丢弃。
-3. **彩色封面/封底**（必须保留彩色）：`remove_watermark.py` 两步法：
+3. **彩色封面/封底**（必须保留彩色，平铺斜纹水印）：`remove_watermark.py`
+   两步法：
    - `build-dmap`：跨所有 B&W 页对"白底"像素（≥235）取分通道均值
      （窄带分布上均值≈中位数）→ 纯水印图案图 D(p)（255-均值），缺口
      inpaint；`2D 相位搜索`确认各页图案同相（同 (0,0) 对齐）。
@@ -469,9 +504,24 @@ OCR 把表格拆成单元格框（每格一个 quad）。Scribus 路线重建：
      算术法极限），可接受。
    - 验证：与 D 图叠加对齐检查 + 原图|成品并排目检（红带/米色带/人脸
      三个检查区）。
+4. **彩色图上的扫描期叠加水印**（水印坐在彩色画作上，Otsu 不适用、
+   D-map 是平铺场景不适用）：`erase_template.py` 模板反混合——
+   需要书内一页水印落在白纸区作模板页（吸收场 a=(P−T)/P，
+   `base=observed/(1−a)` 把底图算回来，只去水印形状、画保留）。
+   **必须在摆正前的 2x 原渲染图上做**（水印在 scanner 空间固定，
+   两页纸倾斜不同不影响同相；摆正后反而错位）。处理完的图走
+   `image_overrides` 整页替换。适用三条件见脚本 docstring（刘秀下册
+   p2 彩色横幅马形水印实测）；与 D-map 场景不重叠，可共存。
 
 ## S6 QA（test_page.py）—— 心得
 
+- **S5 前置门：`margin_ink_check.py`**（框外墨检测，v1.3）：本路线重建
+  模型是 页面=白底+插图+文字层，**插图框外**的墨（版心签条/边线/藏书印/
+  页边徽记）会被静默丢失且 test_page 查不出来。重建前必跑：
+  对每页渲染图 Otsu 后扣除插图框与所有行 quad 外扩，剩余墨 >0.1% 页面积
+  → WARN + 高亮图。处置：确认是页边设计且需保留 → 该页转
+  scan-retypeset 路线（margin_strip）或手工几何进 special_pages；
+  确认是噪声 → book.json 记 `margin_ink_ignored`。无 WARN 才能进 S5。
 - **点号变体归一化**：LXGW 等字体把 U+00B7（·）字形映射为 U+2219（∙），
   `get_text` 提取的文本与数据层不符 → 文本层"缺失 8 页"假警报。
   test_page 已把 U+2219/U+2027/U+30FB 归一到 U+00B7 再比对。
@@ -504,6 +554,9 @@ OCR 把表格拆成单元格框（每格一个 quad）。Scribus 路线重建：
 | Scribus bridge 不启动 | 拉起 `scribus -ns -py bridge.spy` 无 discovery/日志 | 1.6.1 的 `-py` 仅 `-g` 模式执行；加 `-g` 并用 xvfb-run；XDG_RUNTIME_DIR 与 MCP server 对齐 |
 | 识别 JSON 解析 | `KeyError 'text_lines'` | 单行裁剪图太小/超 max_side_limit 时返回 `{'error':...}`；裁剪图保持 ≥140px 高、≤4000px 长边 |
 | 几何被 special JSON 污染 | build_pdf/test_page 报 `KeyError: 'width'` 或 total 虚高 | special JSON 无 width 字段且目录排序在前（page002_special < page002）→ 两脚本已改为读第一个含 width 的 data JSON、total 按最大页号 |
+| OCR bbox 坐标系 | 临时裁剪条带重 OCR 后行位置整体平移/缩放，QA 大面积越界 | MCP server 会把输入图**下采样到长边 ≤1920px**（预处理坐标系）再推理，bbox 在该坐标系而非页面像素——任何 ad-hoc 重 OCR 必须按 crop 缩放比映射回页面空间（正式流程 mcp_batch/rescue_lines 已内置映射，手写脚本时最容易踩；scan-retypeset references/pitfalls.md 同条目） |
+| gs 损坏 CJK 文字层 | `--gs` 后 `get_text` 出乱码（率→豤），字体表 uni=yes 但映射错；gs 10.02.1 实测 | gs pdfwrite 重嵌 CID TrueType 子集时弄坏 ToUnicode 映射 → build_pdf --gs 已带文字层回归门（抽 3 页比对，失败自动弃 gs 版）；Otsu 1-bit 书减容**不能**走 --jpeg-quality（1-bit 转 JPEG 反而变大：实测 43.7→91.2MB）——需换 gs 版本/参数后重试，或接受 ~44MB/160 页 |
+| 1-bit 图 JPEG 膨胀 | `--jpeg-quality` 后体积不降反升（43.7→91.2MB） | `--jpeg-quality` 只适用**灰度网点**图（whiten 插图，如巴黎圣母院半色调木刻）；Otsu 1-bit 图 PNG 已近最优，转 JPEG 编码的是抖动伪影 |
 | 文本层“缺失”假警报 | 多页报 8+ 字符缺失，目检实际都在 | 字体 U+00B7→U+2219 字形映射，test_page 已做点号变体归一化 |
 
 ## 依赖与性能
@@ -532,6 +585,9 @@ OCR 把表格拆成单元格框（每格一个 quad）。Scribus 路线重建：
 - `scripts/` —— mcp_batch.py（含 S1.5 摆正）/ process_page.py（含 --mode
   whiten）/ rescue_lines.py（条带配方）/ line_rescue2.py（逐行 det 框救援）/
   fix_quotes.py（引号保守归一化+待复核清单）/ build_pdf.py（drop_pages+
-  image_overrides+rot_quad+text_invisible+--jpeg-quality）/ test_page.py
+  image_overrides+rot_quad+text_invisible+--jpeg-quality+--ink-top+--gs）/
+  probe_baseline.py（字体墨顶偏移实测，给 --ink-top 供数）/
+  erase_template.py（彩色图扫描期水印模板反混合，摆正前渲染图）/
+  margin_ink_check.py（S5 前置框外墨检测门，WARN 时退出码 1）/ test_page.py
   （drop 映射+点号归一化）/ remove_watermark.py（D 图构建+彩色页反解+
   inpaint）（均可 `--help`，路径参数化）
