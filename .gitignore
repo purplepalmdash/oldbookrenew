@@ -13,6 +13,12 @@ recon/
 *.pdf
 *.sla
 !examples/**/*.pdf
+data/
+out/
+src.pdf
+*.log
+tmp/
+merge_list*
 
 # 模型缓存
 ~/.paddlex/

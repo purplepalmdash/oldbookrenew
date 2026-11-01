@@ -1,0 +1,6 @@
+# pipeline runtime (per-book .venv)
+numpy>=1.26
+opencv-python-headless>=4.9
+pillow>=10.0
+reportlab>=4.0
+pymupdf>=1.23        # 06_verify char-level text audit (rawdict)

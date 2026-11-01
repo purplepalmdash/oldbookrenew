@@ -1,0 +1,218 @@
+{
+  "source_pdf": "src.pdf",
+  "total_pages": 70,
+  "drop_pages": [
+    70
+  ],
+  "panel_pages": [
+    3,
+    68
+  ],
+  "panel_no_offset": 2,
+  "panel_no_format": "paren",
+  "render_dpi": 250,
+  "a4": {
+    "width_pt": 595.28,
+    "height_pt": 841.89,
+    "margin_pt": 56.7
+  },
+  "font": "/usr/share/fonts/TTF/LXGWWenKai-Regular.ttf",
+  "font_name": "LXGWWenKai",
+  "font_pt": 13.5,
+  "ink_em": 0.914,
+  "asc_em": 0.818,
+  "enhance": {
+    "variant": "bw_clear",
+    "contrast_boost": 1.15
+  },
+  "margin_strip": true,
+  "mcp": {
+    "server_dir": "~/paddleocr-mcp",
+    "server_venv_python": "~/paddleocr-mcp/.venv/bin/python",
+    "ocr_language": "ch"
+  },
+  "special_pages": {
+    "1": {
+      "handler": "cover_as_is"
+    },
+    "2": {
+      "handler": "retype",
+      "y_start": 150,
+      "layout": [
+        [
+          "哪　　吒",
+          30,
+          null,
+          {
+            "before": 0
+          }
+        ],
+        [
+          "（根据《封神演义》改编）",
+          14,
+          null,
+          {
+            "before": 16
+          }
+        ],
+        [
+          "李廷柱　蒙南生　编文",
+          14,
+          null,
+          {
+            "before": 34,
+            "align": "left",
+            "x_off": 90
+          }
+        ],
+        [
+          "宋剑锋　绘画",
+          14,
+          null,
+          {
+            "before": 20,
+            "align": "left",
+            "x_off": 90
+          }
+        ],
+        [
+          "电子书制作　铁蛋",
+          12,
+          [
+            0.75,
+            0.05,
+            0.05
+          ],
+          {
+            "before": 20,
+            "align": "left",
+            "x_off": 90
+          }
+        ],
+        [
+          "广西人民出版社",
+          15,
+          null,
+          {
+            "before": 30
+          }
+        ],
+        [
+          "本电子书仅作观赏",
+          11.5,
+          [
+            0.75,
+            0.05,
+            0.05
+          ],
+          {
+            "before": 8,
+            "x_off": 170
+          }
+        ],
+        [
+          "切勿用于其它用途",
+          11.5,
+          [
+            0.75,
+            0.05,
+            0.05
+          ],
+          {
+            "before": 12,
+            "x_off": 170
+          }
+        ],
+        [
+          "不得转载、传播",
+          11.5,
+          [
+            0.75,
+            0.05,
+            0.05
+          ],
+          {
+            "before": 12,
+            "x_off": 170
+          }
+        ],
+        [
+          "否则后果自负",
+          11.5,
+          [
+            0.75,
+            0.05,
+            0.05
+          ],
+          {
+            "before": 12,
+            "x_off": 170
+          }
+        ]
+      ],
+      "images": [
+        {
+          "box": [
+            0.03,
+            0.66,
+            0.25,
+            0.94
+          ],
+          "x_pt": 85,
+          "top_pt": 570,
+          "size_pt": 130,
+          "color": true
+        },
+        {
+          "box": [
+            0.7,
+            0.63,
+            0.805,
+            0.92
+          ],
+          "x_pt": 418,
+          "top_pt": 547,
+          "size_pt": 150,
+          "color": true
+        }
+      ]
+    },
+    "69": {
+      "handler": "colophon",
+      "header": [
+        [
+          "责任编辑：李建琛",
+          11,
+          null,
+          14
+        ],
+        [
+          "哪　　吒",
+          20,
+          null,
+          24
+        ],
+        [
+          "李廷柱　蒙南生　改编　　宋剑锋　绘画",
+          13,
+          null,
+          20
+        ]
+      ],
+      "box_w": 470,
+      "box_h": 90,
+      "box_top_margin": 300,
+      "left": [
+        "广西人民出版社出版",
+        "南宁市红旗印刷厂印刷",
+        "787×1092 1/64　印张1.0625"
+      ],
+      "right_at": {
+        "0": "广西新华书店发行",
+        "1": "1983年6月第1版第1次印刷",
+        "2": "印数：1—133000册"
+      },
+      "footer": "书号：8113·849　　　　　　定价：0.10元"
+    }
+  }
+}

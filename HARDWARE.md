@@ -65,3 +65,27 @@
 | 孙膑和庞涓 114p | 同上 | iGPU | ~15 min |
 | 刘秀上/下册 156+164p | 同上 | iGPU（批量）+ CPU（救援/特判） | 两本合计 ~50 min 识别 |
 | （远程 GPU 模式） | 局域网 RTX 3050 8G 机器 | 远端 CUDA | 与 iGPU 同量级 |
+
+## ④ NVIDIA T4（scan-retypeset 路线，2026-11 刘秀上下册实测）
+
+scan-retypeset（VL 版面 + 行 OCR，GPU 批量）在单张 T4 上的实测档位：
+
+| 步骤 | 158 页书（250dpi） |
+|---|---|
+| `08_batch_infer all`（VL ~5.5s/页 + OCR ~0.3s/页） | ~15-16 min |
+| `01_render` 250dpi（poppler，12 核） | ~10 min（两书共享） |
+| `batch_runpages`（JOBS=6，CPU 受限） | ~4-10 min |
+| Ghostscript /prepress | ~3-5 min |
+| 端到端（含 survey/测量，agent 时间） | 无人值守管线 <40 min |
+
+- **单卡规则**：跑 `08_batch_infer` / `09_rescue` 前停掉常驻 PaddleOCR
+  MCP 服务进程（两套常驻模型可能 OOM），跑完再启。
+- **纯 CPU 机**：识别阶段 ×3-5 慢（VL 是瓶颈；条带救援 `09_rescue` 因
+  裁剪图小仍实用）。质量不变（同模型同代码路径）。最低 4 核 / 8GB /
+  SSD + 每书工作目录 ~500MB（250dpi 渲染为主）。
+- **远程 GPU**：rsync 书目录到 GPU 机跑 08/09，rsync 回 `data/vl` +
+  `data/ocr`，本机继续排版（CPU 即可）。详见
+  `skills/scan-retypeset/references/hardware.md`。
+
+一句话：**scan-retypeset 有 T4 最快，无 T4 也能跑（慢但可用）；
+paddleocr-digitize 在无独显机器上更快**（iGPU/CPU 是它的主场）。
