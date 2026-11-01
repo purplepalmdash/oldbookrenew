@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 工作产物（不进仓库）
+work/
+work*/
+digitize*/
+recon/
+*.pdf
+*.sla
+!examples/**/*.pdf
+
+# 模型缓存
+~/.paddlex/
+models/
+
+# 系统
+.DS_Store

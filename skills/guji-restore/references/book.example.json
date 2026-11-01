@@ -1,0 +1,30 @@
+{
+  "_comment": "guji-restore 项目配置。复制到 <项目根>/book.json 后修改。所有脚本只读这个文件，脚本本身与书无关。",
+  "src_pdf": "234.pdf",
+  "out_pdf": "打印版.pdf",
+  "example_pdf": "example_page1.pdf",
+  "font": "/usr/share/fonts/truetype/lxgw-wenkai/LXGWWenKai-Regular.ttf",
+  "render_dpi": 200,
+  "out_page_pt": [841.89, 595.27],
+  "margin_mm": 20,
+  "keep_pages": [1],
+  "drop_pages": [139],
+  "no_frame_pages": [3, 138],
+  "whiten_params": {},
+  "page_whiten": {},
+  "_help": {
+    "src_pdf": "源扫描 PDF（相对项目根）",
+    "out_pdf": "最终输出 PDF 文件名（写入 out/）",
+    "example_pdf": "参考样张（期望加工效果），S3/S5 调参基准；可空",
+    "font": "重排用 CJK 字体 TTF 路径（会子集嵌入最终 PDF）",
+    "render_dpi": "处理用渲染分辨率，200 为宜（行高约 60-100px）",
+    "out_page_pt": "输出页尺寸 pt。A4 横版 [841.89,595.27]，A4 竖版 [595.27,841.89]",
+    "margin_mm": "输出页边距 mm",
+    "keep_pages": "原样保留的页（彩色封面等），contain-fit 插入",
+    "drop_pages": "不进输出的页（资源站广告页等）",
+    "no_frame_pages": "不做自动图框检测的页（纯文字页、版权页等特殊页）",
+    "whiten_params": "全书 S3 白化参数覆盖（被 work/params.json 冻结值压过）",
+    "page_whiten": "单页 S3 覆盖，key 是页码字符串，如 {\"2\": {\"remove_red\": true}}（删红字声明）；remove_blue 用于蓝字版权页",
+    "process_pages": "可选：显式指定流水线页列表；不填则 = 全部 - keep - drop"
+  }
+}

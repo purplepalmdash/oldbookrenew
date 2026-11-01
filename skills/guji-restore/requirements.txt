@@ -1,0 +1,10 @@
+# Python (>= 3.10)
+pymupdf>=1.24
+Pillow>=10.0
+numpy>=1.26
+
+# System (Debian/Ubuntu):
+#   apt install poppler-utils     # pdftoppm, pdfinfo
+# Font (default, any CJK TTF works):
+#   apt install fonts-lxgw-wenkai
+#   -> /usr/share/fonts/truetype/lxgw-wenkai/LXGWWenKai-Regular.ttf
