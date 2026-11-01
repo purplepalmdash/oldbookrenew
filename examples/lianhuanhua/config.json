@@ -1,0 +1,95 @@
+{
+  "source_pdf": "src.pdf",
+  "total_pages": 139,
+  "drop_pages": [
+    139
+  ],
+  "panel_pages": [
+    4,
+    137
+  ],
+  "panel_no_offset": 3,
+  "panel_no_format": "bare",
+  "render_dpi": 250,
+  "a4": {
+    "width_pt": 595.28,
+    "height_pt": 841.89,
+    "margin_pt": 56.7
+  },
+  "font": "/usr/share/fonts/TTF/LXGWWenKaiMono-Regular.ttf",
+  "font_name": "LXGWWenKaiMono",
+  "font_pt": 13.5,
+  "ink_em": 0.914,
+  "asc_em": 0.818,
+  "enhance": {
+    "variant": "vector",
+    "fine_thr": 160,
+    "coarse_kernel": 19,
+    "coarse_thr": 195,
+    "potrace_t": 5,
+    "potrace_alpha": 1.0,
+    "potrace_opt": 1.0,
+    "raster_scale": 2.0
+  },
+  "mcp": {
+    "server_dir": "~/paddleocr-mcp",
+    "server_venv_python": "~/paddleocr-mcp/.venv/bin/python",
+    "ocr_language": "ch"
+  },
+  "special_pages": {
+    "1": {
+      "handler": "cover_as_is"
+    },
+    "2": {
+      "handler": "title_page",
+      "title": "龙子太郎",
+      "title_pt": 64,
+      "credits": [
+        [
+          "原著",
+          "松谷美代子"
+        ],
+        [
+          "改编",
+          "张宇平"
+        ],
+        [
+          "绘画",
+          "陆新森 吕振敏"
+        ]
+      ],
+      "publisher": "河北美术出版社"
+    },
+    "3": {
+      "handler": "retype",
+      "ocr": "data/ocr/spec_p3.json",
+      "title_idx": 0,
+      "title_pt": 22,
+      "body_pt": 14
+    },
+    "138": {
+      "handler": "colophon",
+      "tab_title": "龙子太郎",
+      "box_w": 470,
+      "box_h": 165,
+      "box_top_margin": 120,
+      "left": [
+        "原著者：松谷美代子　　改编者：张宇平",
+        "绘  者：陆新森  吕振敏",
+        "出版者：河北美术出版社出版（石家庄市北马路45号）",
+        "开  本：787×1092毫米1/64　印张：2.125　1984年7月第1版　1984年7月第1次印刷　印数：232,000"
+      ],
+      "right_at": {
+        "0": "责任编辑：张秋菊",
+        "1": "封面绘者：陆 鑫",
+        "2": "印  刷  者：河北新华印刷三厂"
+      },
+      "footer": "统一书号：8087·855        定价：0.19元",
+      "color": [
+        0.15,
+        0.35,
+        0.75
+      ]
+    }
+  }
+}

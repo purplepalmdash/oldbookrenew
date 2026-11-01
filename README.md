@@ -84,7 +84,14 @@ scanned-book-retypeset/
 │   │   └── lib/common.py       #   路径/坐标/数据加载
 │   ├── batch_runpages.sh       # ← 拷贝到 <book>/（书根目录）
 │   └── test_pages.py           # ← 拷贝到 <book>/
-├── docs/samples/               # 效果样张（本仓库 README 用）
+├── examples/                 # 案例书配置 + 案例笔记（config 参考样板）
+│   ├── lianhuanhua/          #   《龙子太郎》（vector 变体基准书）
+│   ├── nezha/                #   《哪吒》（左栏 running design、印章）
+│   ├── paris/                #   《巴黎圣母院》（dot 编号、无号页、整版底图）
+│   └── liuxiu/               #   《刘秀》下册（重泛黄 + 全册水印 + erase_tmpl）
+├── CHANGELOG.md              # 版本记录
+├── install.sh                # 安装为 pi 技能（SKILL.md + references + scripts）
+├── docs/samples/             # 效果样张（本仓库 README 用）
 ├── requirements.txt
 └── LICENSE
 ```
@@ -192,4 +199,4 @@ gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.5 -dPDFSETTINGS=/prepress \
 
 ## 许可证 (License)
 
-[MIT](LICENSE)
+[MIT](LICENSE) — 版本记录见 [CHANGELOG.md](CHANGELOG.md)。
