@@ -1,0 +1,120 @@
+{
+  "_comment": "scan-retypeset book config. Copy to <book>/pipeline/config.json. All page numbers are 1-based PDF page indices. See skill/references/config.md for the full reference.",
+  "source_pdf": "book.pdf",
+  "total_pages": 100,
+  "drop_pages": [],
+  "panel_pages": [
+    3,
+    97
+  ],
+  "panel_no_offset": 2,
+  "panel_no_format": "bare",
+  "_panel_no_format_help": "bare = '9  text' (number + gap); paren = '（9）text' (fullwidth parens); dot = '9. text' (number + period + space, e.g. 巴黎圣母院). Extraction is style-agnostic; the setting fixes the canonical re-typeset token.",
+  "_no_panel_no_help": "panel-range pages that print NO leading number (e.g. an unnumbered prologue run): the number anchor check is skipped for them.",
+  "no_panel_no": [],
+  "render_dpi": 250,
+  "a4": {
+    "width_pt": 595.28,
+    "height_pt": 841.89,
+    "margin_pt": 56.7
+  },
+  "font": "/usr/share/fonts/TTF/LXGWWenKai-Regular.ttf",
+  "font_name": "LXGWWenKai",
+  "font_pt": 13.5,
+  "ink_em": 0.914,
+  "asc_em": 0.818,
+  "enhance": {
+    "variant": "bw_clear",
+    "contrast_boost": 1.15,
+    "color_auto": "auto",
+    "_color_auto_help": "auto = per-figure is_color_image detection (p99 chroma > 30 -> color_as_is). REQUIRED OVERRIDES: heavily YELLOWED gray scans must set \"off\" — the yellow cast alone pushes paper chroma past the threshold (刘秀 下册: paper chroma ≈ 70) and every figure would be kept yellow as-is; a figure with subtle color below the threshold can be forced with \"on\". Ignored when variant=vector (always B/W).",
+    "_variant_help": "bw_clear = grayscale cleaned scan (default for grayscale scans); vector = freshly-printed high-contrast black-and-white, detail-preserving (page-level illumination fit + local tone-relative binarize + potrace SVG master + 1-bit high-res raster). vector needs potrace + rsvg-convert (degrades gracefully without). COLOR-FIGURE RULE (default variant only, color_auto=auto): a figure with meaningful color (p99 per-pixel max(R,G,B)-min(R,G,B) > 30, lib.common.is_color_image) is auto-routed to color_as_is - original color placed 1:1, no pixel treatment at all; the print_fitness grayscale check is then skipped for the page.",
+    "vector": {
+      "T_dark": 190,
+      "T_solid": 150,
+      "dev": 25,
+      "bright_dev": 45,
+      "bright_tone": 185,
+      "tone_kernel": 31,
+      "speckle_px": 10,
+      "close": 1,
+      "potrace_t": 2,
+      "potrace_alpha": 1.0,
+      "potrace_opt": 1.0,
+      "raster_scale": 2.0,
+      "_help": "v2 detail-preserving local binarization. T_dark: global ink threshold (dark lines on light paper). T_solid: local tone below which the region is a dense tone -> flat black. dev: pixels darker than their local tone by this much are ink (halftone dots/lines of mid-tone, kept as pattern not solid). bright_dev: pixels brighter than local tone by this much are white detail (light lines carved into dark tone). tone_kernel: neighbourhood for the tone estimate. speckle_px: drop ink components smaller than this (scan noise). close: morphological closing radius to reconnect 1px line fragments. potrace_t: noise tolerance for the SVG master (2 keeps small dots; 5 drops them)."
+    }
+  },
+  "margin_strip": true,
+  "_margin_strip_help": "crop + redraw the printed running design in the page margins 1:1 — right side (edge line / running-title tab / red seal) and LEFT side (small emblems, e.g. the 刘秀 horse mark). Both auto-detected per page; blank margins are skipped, so leave it on for books without margin design.",
+  "watermark_boxes": [],
+  "_watermark_boxes_help": "Watermarks added by later (re)scanners, painted out of the deskewed page in 03_enhance (so figure + margin-strip crops come out clean) and their OCR line is dropped in 04_merge. List of normalized page boxes [x0,y0,x1,y1] (fractions of render W/H). Measure the watermark's ink bbox by pixel projection on several panel pages — a scan-time overlay is identical on every page, so one box covers the book. A line is dropped when its bbox CENTRE is inside a box AND it starts from the left 60% of the box's x span (real caption lines ending in the same corner start further right). 刘秀 下册 example: [[0.0, 0.842, 0.200, 0.993]] (horse + '天岸马奇通人中龙' slogan + thin underline, bottom-left, all panel pages). For special pages, add the same box to whiteout_boxes; a watermark sitting ON a colored banner image gets the image's `erase_tmpl` {\"page\": N, \"boxes\": [...]} (PREFERRED: template un-blending from a plain-paper page N — restores the underlying art, only the watermark shape is removed) with `erase_ink` (pixel-level dark-ink replacement) as fallback when no plain-paper page exists. See references/watermark.md.",
+  "mcp": {
+    "server_dir": "~/paddleocr-mcp",
+    "server_venv_python": "~/paddleocr-mcp/.venv/bin/python",
+    "ocr_language": "ch"
+  },
+  "special_pages": {
+    "1": {
+      "handler": "cover_as_is"
+    },
+    "2": {
+      "handler": "title_page",
+      "title": "书名",
+      "title_pt": 64,
+      "subtitle": "pinyin / 副题",
+      "emblem": {
+        "region": [
+          0.25,
+          0.1,
+          0.75,
+          0.85
+        ],
+        "color": true,
+        "size_pt": 260,
+        "top_margin_pt": 140,
+        "center_x_offset": 40
+      },
+      "credits": [
+        [
+          "编 者",
+          "某某"
+        ],
+        [
+          "绘 画",
+          "某某"
+        ]
+      ],
+      "publisher": "某某出版社",
+      "note": "本电子书仅作观赏"
+    },
+    "98": {
+      "handler": "colophon",
+      "header": [
+        [
+          "责任编辑：某某",
+          11
+        ],
+        [
+          "书 名",
+          16
+        ]
+      ],
+      "tab_title": "书名",
+      "box_w": 470,
+      "box_h": 165,
+      "box_top_margin": 200,
+      "left": [
+        "出版者：某某出版社（地址）",
+        "印  刷  者：某某印刷厂",
+        "开  本：787×1092毫米1/64　印张：1.0",
+        "1983年6月第1版　1983年6月第1次印刷　印数：1—10000册"
+      ],
+      "right_at": {
+        "0": "发 行：某某书店",
+        "1": "定价：0.10元"
+      },
+      "footer": "统一书号：0000·000"
+    }
+  }
+}
