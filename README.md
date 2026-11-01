@@ -39,6 +39,10 @@ LLM 在线 → `guji-restore`。三技能可混用：主流程跑一条，疑难
 
 ## 安装
 
+> **刚装完 pi、手里只有一本扫描 PDF 的新手**：先读
+> [START_FROM_ZERO.md](START_FROM_ZERO.md)（硬件决策 → 安装 → 一句话
+> 开工 → 你要点头的几个点），本节是其中第 3 步的展开。
+
 ```sh
 # pi 用户（默认，安装全部技能到 ~/.pi/agent/skills/）
 ./install.sh
@@ -58,7 +62,9 @@ Scribus 可选）见各自 `SKILL.md` 的 Prerequisites/Setup 一节。
 
 ```
 README.md                # 本文件（路由入口）
+START_FROM_ZERO.md       # 新手从零指南（硬件决策 → 安装 → 一句话开工）
 HARDWARE.md              # 硬件/系统要求分档（最低/核显/T4 实测/远程 GPU/验证环境清单）
+MERGE_PLAN.md            # bread × test-mc12le000 整合方案与执行状态
 install.sh               # 安装 skills/* 到 agent 技能目录
 LICENSE                  # MIT（技能文本与脚本）
 skills/
