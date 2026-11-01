@@ -98,6 +98,14 @@ reading their 刘秀/孙膑/巴黎圣母院 runs:
   - Root README 龙子太郎 row: its right-side decorative bar sits INSIDE
     the frame (kept by figure crop), not an out-of-frame margin running
     design — margin_strip's motivating case remains 哪吒 only.
+- **Cross-absorbed from bread v1.3 post-A work** (their new pitfalls,
+  validated on their 刘秀下 rebuild): `pitfalls.md` #42 (gs 10.02.1 corrupts
+  the CJK ToUnicode map of subsetted CID fonts — pdffonts still reports
+  embedded, pdftotext garbles; our gs 10.07.1 verified clean on the 刘秀
+  final PDFs via a 3-page character-multiset gate, and the gate is now a
+  MANDATORY step in workflow.md §7 after the GS optimize) and #43 (don't
+  JPEG-recompress 1-bit dithered images — they bloat 2x; JPEG only helps
+  grayscale halftone dot art).
 
 ## 0.6.2 (2026-11-01)
 

@@ -208,6 +208,31 @@ gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.5 -dPDFSETTINGS=/prepress \
    -sOutputFile=out/<stem>_retypeset_opt.pdf out/<stem>_retypeset.pdf
 ```
 
+**GATE (pitfall #42)** — some Ghostscript versions (10.02.1 confirmed; our
+10.07.1 is clean but the bug is version-specific) corrupt the CJK ToUnicode
+map of subsetted CID fonts: `pdffonts` still reports the font embedded, but
+`pdftotext` returns garble (率→豤). Before shipping, compare the text layer
+of 3 sample pages before vs after GS (character multiset); on mismatch keep
+the pre-GS PDF (or retry with another gs) — never ship a visually fine PDF
+with a broken text layer:
+
+```bash
+for p in 5 80 163; do   # first panel / middle / last — adjust per book
+  pdftotext -f $p -l $p out/<stem>_retypeset.pdf     /tmp/gs_pre_$p.txt
+  pdftotext -f $p -l $p out/<stem>_retypeset_opt.pdf /tmp/gs_post_$p.txt
+done
+python3 - <<'EOF'
+import re
+from collections import Counter
+ok = True
+for p in (5, 80, 163):
+    a = Counter(re.sub(r'\s', '', open(f'/tmp/gs_pre_{p}.txt').read()))
+    b = Counter(re.sub(r'\s', '', open(f'/tmp/gs_post_{p}.txt').read()))
+    print(f"p{p}: text-layer {a == b}"); ok &= a == b
+print("GS text-layer gate:", "PASS" if ok else "FAIL - keep the pre-GS PDF")
+EOF
+```
+
 ## 8. Final verification
 
 ```bash

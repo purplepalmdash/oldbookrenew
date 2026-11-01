@@ -541,3 +541,21 @@ rsvg round-trip to verify losslessness — expect equal counts.)
     books like 哪吒 — running-title tab + red seal — have plenty of area
     and never hit this edge; verify the thin-line case on a book whose
     only margin element is an edge line.)
+42. **Ghostscript can silently corrupt the CJK text layer (version-
+    specific).** gs 10.02.1 (confirmed by the sibling skill on its build_pdf
+    route) re-embeds the CID TrueType subset and breaks the ToUnicode
+    map: `pdffonts` still shows the font embedded, `pdftotext` returns
+    garble (率→豤), so a naive "fonts OK" check passes a broken PDF.
+    Our gs 10.07.1 is clean (刘秀 final PDFs passed a 3-page character-
+    multiset gate before/after GS), but the bug is per-version — ALWAYS
+    run the text-layer regression gate in workflow.md §7 (3 sample pages,
+    character-multiset compare before vs after gs); on mismatch keep the
+    pre-GS PDF (or find a gs version that preserves ToUnicode).
+    Cross-ref: paddleocr-digitize incident manual, same finding, with an
+    auto-abort gate in `build_pdf.py --gs`.
+43. **Don't JPEG-recompress 1-bit (Otsu/halftone) images — they BLOAT.**
+    A 1-bit dithered/halftone image has no smooth gradients, so JPEG
+    encodes the dithering noise itself: the sibling skill measured
+    43.7MB→91.2MB at quality 85 (2x larger). JPEG recompression only
+    helps GRAYSCALE halftone (dot) art; keep 1-bit images as Flate/PNG
+    (or mono) through the final optimize step.

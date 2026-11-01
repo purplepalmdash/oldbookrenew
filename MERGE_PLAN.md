@@ -77,6 +77,17 @@
 - **第 6 节验证**：刘秀下回归基线 = 158/158 页 06_verify PASS（含 #11 chars）；
   A1 erase_tmpl 样张 = 刘秀下册 p2（技能内 docs/samples 已含去水印前后图）；
   A3 margin_strip 样张、B3 D-map 样张（alibaba40 封面）、iGPU 交叉验证 = 待办。
+- **交叉验证 bread v1.3 / commit a3fddd2（A 组，2026-11-01）**：
+  - 零污染确认：6 个改动文件全部在 `skills/paddleocr-digitize/` 内 + 本文件注记；
+    4 个脚本 py_compile 通过；默认行为零漂移（--gs/--ink-top 均 opt-in）。
+  - 其新坑（gs 10.02.1 损坏 CJK ToUnicode）对照我方成品验证：本机 gs 10.07.1，
+    024/025 成品 PDF 均通过 GS 前后 3 页（p5/p80/p163）字符多重集门 → 全等。
+    该门已固化为 scan-retypeset workflow.md §7 的强制步骤；pitfalls 新增
+    #42（gs 文字层，互引双方事故手册）+ #43（1-bit 图禁 JPEG 重压缩，
+    实测 43.7→91.2MB 膨胀案例）。
+  - 共享跟踪项登记：A1 真书案例（彩色图扫描期水印 + 无 T4 机器）、细边线真书
+    验证（其 A3 margin_ink_check ↔ 我方 I-3 同源）——遇到首本符合条件的书
+    即触发，任一方可做。
 
 ---
 
