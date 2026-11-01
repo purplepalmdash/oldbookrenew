@@ -279,8 +279,12 @@ heavily yellowed + du1001 watermark vs 025 上册 clean):
   half the cluster height (y0 rule, not center-distance). Split lines whose
   height exceeds 1.3× the median line height (OCR fused two lines).
 - Typeset line width: target = the original line's mapped width; shrink
-  font to fit (floor 0.60×) then add tracking (cap 0.08 em) only when
-  under target. This reproduces the original rag/width per line.
+  font to fit (floor 0.60×) then add tracking only when under target
+  (cap `type_settings.track_cap_em`, default 0.35 em — the stretch amount
+  is exactly target−natural, so the cap only binds on very wide original
+  spacing). Lines mixing CJK with digits/Latin get advance-WEIGHTED gaps
+  (slot ∝ advance, `weighted_gaps`) instead of uniform — uniform tracking
+  over-spaces narrow digits; pure CJK lines keep the uniform path.
 - Restamp only *faded* frame edges (per-edge), never the whole box —
   full restamps make frames double-thick and fool the figure QA.
 - Figure QA: percentile (0.2/99.8) bbox of non-white pixels measured

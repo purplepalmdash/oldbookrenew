@@ -33,7 +33,7 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib.common import (A4_H, A4_W, CONFIG, FONT_NAME, FONT_PATH, MARGIN,  # noqa: E402
-                        RENDER_DPI, ROOT, load_json)
+                        RENDER_DPI, ROOT, load_json, weighted_gaps)
 
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -279,22 +279,42 @@ def _draw_justified(c: canvas.Canvas, text: str, x: float, y: float,
     margin must keep reaching it).
     """
     track = 0.0
+    gaps = None
     if width and len(text) > 1:
         natural = c.stringWidth(text, FONT_NAME, pt)
         if width > natural:
-            track = (width - natural) / (len(text) - 1)
+            # B5 weighted slots: mixed CJK + digit/Latin lines get gaps
+            # weighted by the adjacent advances (uniform tracking would
+            # over-space the narrow digits); pure full-width lines keep
+            # the uniform path (identical output).
+            if any(0x2E80 <= ord(ch) for ch in text) and any(
+                    ord(ch) < 0x2E80 and not ch.isspace() for ch in text):
+                gaps = weighted_gaps(text, FONT_NAME, pt,
+                                     width - natural, pt * 0.35)
+                track = sum(gaps) / len(gaps)
+            else:
+                track = (width - natural) / (len(text) - 1)
     tobject = c.beginText(x, y)
     tobject.setFont(FONT_NAME, pt)
-    # ALWAYS set charSpace: reportlab only emits the Tc operator for
-    # NON-ZERO values, so setCharSpace(0) is a no-op and the canvas's
-    # previous tracking leaks into the next text object — a justified
-    # line's tracking otherwise stretches every following line's cells
-    # to pt + track (《孙膑和庞涓》 p114 colophon: the title's 28.75 pt
-    # tracking made the left column 2.9 em cells and pushed it into the
-    # right column's x-range). An imperceptible -0.001 pt forces a reset.
-    tobject.setCharSpace(track if track else -0.001)
     tobject.setFillColorRGB(*color)
-    tobject.textLine(text)
+    if gaps:
+        # B5: per-character draws with advance-weighted gaps.
+        # reportlab emits Tc only for non-zero values: force a reset
+        # with -0.001 for zero/tiny gaps.
+        for i, ch in enumerate(text):
+            g = gaps[i] if i < len(gaps) else 0.0
+            tobject.setCharSpace(g if g >= 0.005 else -0.001)
+            tobject.textOut(ch)
+    else:
+        # ALWAYS set charSpace: reportlab only emits the Tc operator for
+        # NON-ZERO values, so setCharSpace(0) is a no-op and the canvas's
+        # previous tracking leaks into the next text object — a justified
+        # line's tracking otherwise stretches every following line's cells
+        # to pt + track (《孙膑和庞涓》 p114 colophon: the title's 28.75 pt
+        # tracking made the left column 2.9 em cells and pushed it into the
+        # right column's x-range). An imperceptible -0.001 pt forces a reset.
+        tobject.setCharSpace(track if track else -0.001)
+        tobject.textLine(text)
     c.drawText(tobject)
 
 

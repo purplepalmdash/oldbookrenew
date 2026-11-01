@@ -106,7 +106,9 @@ Full free-form re-typesetting of a page (frontispiece, synopsis, …).
   each line's span was measured from the scan. For CJK justified lines
   the right size is `pt = measured_width / char_count` (keeps the exact
   original line span; tracking is only added when width exceeds
-  natural).
+  natural; lines mixing CJK with digits/Latin use advance-weighted gaps
+  (slot ∝ advance) instead of uniform tracking — see the typeset note
+  in SKILL.md).
   **Sizing rule for uniform text blocks** (synopsis paragraphs): one `pt`
   for the whole block — the MEDIAN of the measured line ink heights —
   not one size per line. Per-line sizing turns per-line ink jitter

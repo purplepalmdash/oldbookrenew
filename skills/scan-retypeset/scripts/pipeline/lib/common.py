@@ -421,8 +421,41 @@ def ocr_bbox_to_page(bbox: list, geo: dict) -> list:
         int(x0 + bbox[0] / scale),
         int(y0 + bbox[1] / scale),
         int(x0 + bbox[2] / scale),
-        int(y0 + bbox[3] / scale),
+        int(x0 + bbox[3] / scale),
     ]
+
+
+def weighted_gaps(text: str, font_name: str, pt: float, extra: float,
+                  cap: float = 0.0) -> list:
+    """Inter-character gaps for a justified line (B5 weighted-slot rule).
+
+    Bread's rule for justified text: each character gets a slot
+    proportional to its ADVANCE (slot_i ∝ adv_i) — uniform tracking gives
+    narrow digits the same gaps as CJK characters, so mixed lines like
+    "共 156 页" visibly over-space the digits.  Weighting the gap between
+    two characters by the mean of their advances is exactly equivalent to
+    slot ∝ advance, and degenerates to uniform tracking for pure
+    full-width lines (the historical behavior).
+
+    Returns len(text)-1 gaps in pt that sum to `extra` (unless clipped by
+    `cap`, which only bites on very wide original spacing).  All zeros
+    when `extra <= 0`.
+    """
+    from reportlab.pdfbase import pdfmetrics
+    n = len(text)
+    if n < 2:
+        return []
+    if extra <= 0:
+        return [0.0] * (n - 1)
+    advs = [pdfmetrics.stringWidth(ch, font_name, pt) for ch in text]
+    ws = [(advs[i] + advs[i + 1]) * 0.5 for i in range(n - 1)]
+    total = sum(ws)
+    if total <= 0:
+        return [min(extra / (n - 1), cap) if cap else extra / (n - 1)
+                ] * (n - 1)
+    if cap:
+        return [min(extra * w / total, cap) for w in ws]
+    return [extra * w / total for w in ws]
 
 
 def _row_cov(gray: np.ndarray, y: int, x0: int, x1: int) -> float:

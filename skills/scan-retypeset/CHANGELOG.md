@@ -41,6 +41,15 @@ reading their 刘秀/孙膑/巴黎圣母院 runs:
   LOCAL-BRIGHTNESS-DEPENDENT response r (fixed r over-corrects dark
   color bands → dark ghost) + TELEA inpaint fallback. Positioned
   alongside `watermark_boxes` / `erase_tmpl` / `erase_ink`.
+- **B5 weighted-slot tracking** (`lib/common.py::weighted_gaps`, used by
+  `05_typeset` and `07_special::_draw_justified`) — justified lines that
+  mix CJK with digits/Latin now get inter-character gaps weighted by
+  the adjacent glyph advances (slot ∝ advance, the bread rule): uniform
+  tracking gave narrow digits the same gaps as CJK characters and
+  visibly over-spaced them. Pure full-width lines keep the historic
+  uniform path byte-for-byte; the weighted path draws per character
+  (reportlab Tc per char). `placed` rows gain a `wtrack` flag; `track`
+  reports the mean gap on weighted lines.
 - **`pitfalls.md` +5 (36-40)**: minAreaRect angle metadata (0.5°→89.5°;
   our 02_geometry already uses the safe top-edge atan2 — documented as
   the pattern), dot-glyph QA false alarm (U+00B7→U+2219), rawdict vs

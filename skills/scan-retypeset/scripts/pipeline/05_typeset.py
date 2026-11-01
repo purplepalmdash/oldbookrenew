@@ -14,7 +14,9 @@
   and the second pass removes that offset so the figure/text gap the user
   sees matches the original by construction.
 - Full lines get per-character tracking so each line spans exactly its
-  original width (recreates the original justification).
+  original width (recreates the original justification); lines mixing
+  CJK with digits/Latin use advance-weighted gaps (B5 weighted slots,
+  lib.common.weighted_gaps) so narrow digits are not over-spaced.
 - LXGW WenKai embedded; text selectable.
 
 Usage: .venv/bin/python pipeline/05_typeset.py --page 10
@@ -33,7 +35,7 @@ from reportlab.pdfgen import canvas
 
 from lib.common import (A4_H, A4_W, FONT_NAME, FONT_PATH, INK_EM, ROOT,
                         TYPESET, gap_scan, line_dense_top_pt, load_json,
-                        map_pt, rebuild_map)
+                        map_pt, rebuild_map, weighted_gaps)
 
 # maximum per-character tracking used to stretch a line to its original
 # width, in em. 0.35 covers justified lines of most mid-century books;
@@ -169,11 +171,24 @@ def _typeset_once(page: int, dtop_delta_pt: float):
         c.setFont(FONT_NAME, fpt)
         natural = c.stringWidth(text, FONT_NAME, fpt)
         track = 0.0
+        gaps = None
         if target > 10 and n_units >= 2 and natural < target:
-            track = min((target - natural) / max(1.0, n_units - 1),
-                        fpt * TRACK_CAP_EM)
-            if track < fpt * 0.005:
-                track = 0.0
+            # B5 weighted slots: mixed CJK + digit/Latin lines get gaps
+            # weighted by the adjacent advances (uniform tracking would
+            # over-space the narrow digits); pure full-width lines keep
+            # the historic uniform path (identical output).
+            if any(0x2E80 <= ord(ch) for ch in text) and any(
+                    ord(ch) < 0x2E80 and not ch.isspace() for ch in text):
+                gaps = weighted_gaps(text, FONT_NAME, fpt,
+                                     target - natural, fpt * TRACK_CAP_EM)
+                if max(gaps) < fpt * 0.005:
+                    gaps = [0.0] * (len(text) - 1)
+                track = sum(gaps) / len(gaps)
+            else:
+                track = min((target - natural) / max(1.0, n_units - 1),
+                            fpt * TRACK_CAP_EM)
+                if track < fpt * 0.005:
+                    track = 0.0
         # Placement target: the original's *measured* ink row (>=3% row
         # average — the same row definition the verify scan uses). For the
         # first line below the frame that is the figure_text_gap anchor, so
@@ -188,19 +203,29 @@ def _typeset_once(page: int, dtop_delta_pt: float):
         baseline_top = target_top_pt + d_top
         tobject = c.beginText(x0_pt, A4_H - baseline_top)
         tobject.setFont(FONT_NAME, fpt)
-        # reportlab emits Tc only for non-zero values: setCharSpace(0) is a
-        # no-op, so a previous line's tracking leaks into this one (cells
-        # stretched to fpt + leaked_track). Force a reset with -0.001.
-        tobject.setCharSpace(track if track else -0.001)
         tobject.setFillColorRGB(0, 0, 0)
-        tobject.textLine(text)
+        if gaps:
+            # B5: per-character draws with advance-weighted gaps.
+            # reportlab emits Tc only for non-zero values: force a reset
+            # with -0.001 for zero/tiny gaps.
+            for i, ch in enumerate(text):
+                g = gaps[i] if i < len(gaps) else 0.0
+                tobject.setCharSpace(g if g >= fpt * 0.005 else -0.001)
+                tobject.textOut(ch)
+        else:
+            # reportlab emits Tc only for non-zero values: setCharSpace(0)
+            # is a no-op, so a previous line's tracking leaks into this one
+            # (cells stretched to fpt + leaked_track). Force a reset with
+            # -0.001.
+            tobject.setCharSpace(track if track else -0.001)
+            tobject.textLine(text)
         c.drawText(tobject)
         placed.append({"idx": li, "x0_pt": round(x0_pt, 2),
                        "y_center_pt": round(y_center_pt, 2),
                        "ink_bbox_pt": [round(map_pt(rm, 0, ink[1])[1], 2),
                                        round(map_pt(rm, 0, ink[3])[1], 2)],
                        "font_pt": round(fpt, 2), "track": round(track, 3),
-                       "full": full, "text": text})
+                       "wtrack": bool(gaps), "full": full, "text": text})
     c.save()
 
     # stash placement info for verification (incl. figure->text gap audit)
