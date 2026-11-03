@@ -120,3 +120,39 @@ PaddleX `PP-DocLayout_plus-L`（ONNX + OpenVINO），工具
 - 保持 stdin 打开直到响应返回；`call_tool` 的 `input_data` 传**绝对路径**。
 - 小图/超长图可能返回 `{"error": ...}`（如超 `max_side_limit 4000`），
   调用方要判 key，不要直接取 `text_lines`。
+
+## 7. 竖排文字相关服务（远程 GPU，2026-11 哪吒闹海/青蛙与老虎/白蛇传 301页验证）
+
+- `8775`：paddleocr_mcp + `ocr_vert.yaml`（PP-OCRv6 det/rec 竖排调参：低
+  thresh/box_thresh、高 unclip_ratio，保竖列淡点小标点；textline-orientation
+  关闭——PP-OCRv6 rec 原生读竖排 CJK，2 分类器在 det 框变大时会把边缘框
+  翻成 180° 反而乱码）。接口与 8765 完全相同（input_data/output_mode），
+  可整本 PDF 单调用粗读。
+- `8785`：**vcol 竖排专用**（`vcol_server.py`，`VCOL_MCP_HTTP=1` 起）。
+  工具 `ocr_vertical`（图片输入，data URL/base64/路径）：整列裁剪单次 rec
+  （保留标点）+ 同列拆段 quad 合并 + 黑底白字列反色 + 缺口 5 字窗救援 +
+  `□` 占位；输出 `columns` 已按**阅读序（右→左）**排好，含逐字 y、score、
+  `dark_bg`。未入 systemd，重启后需 `bash <PADDLEOCR_HOME>/run_vcol_http.sh`
+  拉起。一次性客户端（mcp 2.3.0，`streamable_http_client` 解包 2 个值）：
+
+```python
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+import base64, json, asyncio
+
+async def ocr_vertical(png_bytes: bytes) -> dict:
+    b64 = base64.b64encode(png_bytes).decode()
+    async with streamable_http_client("http://192.168.1.214:8785/mcp") as (ro, wo):
+        async with ClientSession(ro, wo) as s:
+            await s.initialize()
+            r = await s.call_tool("ocr_vertical",
+                {"image_path": f"data:image/png;base64,{b64}"})
+    return json.loads(r.content[0].text)
+```
+
+  批量：一个会话循环逐页（286 页 ≈ 6 分钟，0.2–1.3s/页）；渲染 dpi 经验
+  大页（~768pt 宽）150dpi、小字小页（~280pt 宽）300dpi（字高 <14px 时
+  □ 显著增多，先单页 A/B 试 dpi 再批量）。
+- 分工：竖排精排（列序/标点/页码/逐字坐标）用 8785；8775 仅作整本粗读的
+  单调用替代。混排书分治（横排→标准/竖排→vcol/气泡不OCR/置信度分流）见
+  SKILL.md"混排书籍分治路由"节。

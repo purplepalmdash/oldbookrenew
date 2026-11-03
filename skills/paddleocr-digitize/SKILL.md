@@ -1,10 +1,10 @@
 ---
 name: paddleocr-digitize
-description: "用 PaddleOCR MCP 把扫描版书刊（连环画/图画书/老杂志：带边框插图+字幕，泛黄、无文字层）数字化重排为可打印、文字可选取、坐标与原书严格一致的 PDF：逐页 JSON（layout 坐标+每行 quad 起止点）、插图边框水平对齐+Otsu 黑白化、低置信乱码字幕行救援（条带增强重识别）、竖排文字（90°旋转识别+逐字堆叠）、字符级逐页比对测试。与 guji-restore（LLM 识别/灰度保网点路线）互补：用户要求用 PaddleOCR/PaddleOCR MCP 识别、或要求纯黑白+严格原坐标重建、或书带边框插图+横排字幕时选本技能。"
+description: "用 PaddleOCR MCP 把扫描版书刊（连环画/图画书/老杂志：带边框插图+字幕，泛黄、无文字层）数字化重排为可打印、文字可选取、坐标与原书严格一致的 PDF：逐页 JSON（layout 坐标+每行 quad 起止点）、插图边框水平对齐+Otsu 黑白化、低置信乱码字幕行救援（条带增强重识别）、混排书分治路由（对话气泡默认不OCR/横排→标准OCR/竖排→vcol专用/低置信→视觉模型目读）、竖排文字（vcol整列识别或90°旋转识别+逐字堆叠）、字符级逐页比对测试。与 guji-restore（LLM 识别/灰度保网点路线）互补：用户要求用 PaddleOCR/PaddleOCR MCP 识别、或要求纯黑白+严格原坐标重建、或书带边框插图+横排字幕时选本技能。"
 compatibility: "Python 3.10+ venv（pymupdf, opencv-python, numpy, mcp>=2.3, onnxruntime, onnxruntime-openvino, openvino）+ PaddleOCR MCP server（官方 paddleocr_mcp + 自建 layout_server.py，见 references/mcp-setup.md）+ 一个 CJK TTF 字体（LXGW WenKai）。国内镜像源 pip 安装。"
 metadata:
-  version: "1.3"
-  origin: "Distilled from the longzitailang project (139-page scanned lianhuanhua) + alibaba40 project (63-page, watermark/deskew/CPU-only, 2026-10) + liuxiu project (test3 上/下册 156+164 页双路线批量：白净→Scribus 两端对齐 slot，泛黄→build_pdf Otsu，2026-11) + oldbookrenew main 整合（2026-11：A 组吸收——erase_template 模板反混合 / build_pdf --gs Ghostscript 终优化 / --ink-top + probe_baseline 实测基线 / margin_ink_check 框外墨检测门 / 水印判定子技能）"
+  version: "1.4"
+  origin: "Distilled from the longzitailang project (139-page scanned lianhuanhua) + alibaba40 project (63-page, watermark/deskew/CPU-only, 2026-10) + liuxiu project (test3 上/下册 156+164 页双路线批量：白净→Scribus 两端对齐 slot，泛黄→build_pdf Otsu，2026-11) + oldbookrenew main 整合（2026-11：A 组吸收——erase_template 模板反混合 / build_pdf --gs Ghostscript 终优化 / --ink-top + probe_baseline 实测基线 / margin_ink_check 框外墨检测门 / 水印判定子技能） + 混排书分治路由（2026-11-03：对话气泡默认不OCR / 横排→标准ocr(8765)、竖排→vcol专用服务(8785) / 置信度分流→视觉模型目读；哪吒闹海·青蛙与老虎·白蛇传 301页验证）"
 ---
 
 # 扫描书刊数字化（paddleocr-digitize）
@@ -74,6 +74,35 @@ metadata:
 ```
 
 旁路：`scripts/remove_watermark.py`（彩色页斜纹水印去除，见下）。
+
+## 混排书籍分治路由（横/竖 + 气泡 + 置信度）—— 2026-11 三书 301 页验证
+
+文字方向混杂的书（横排前/后页 + 竖排正文等），**先定结构再分治**：
+
+1. **定结构**：整书低清 contact sheet 总览（≤2000px，一轮只读 1 张）→
+   划分 前页/正文/后页 并确认各部分文字方向（横/竖）。
+2. **按方向分治**：
+   - 横排 → 标准管线（本技能 S1–S6 原样；纯提文本时整段 PDF 直接送 8765 `ocr` 单调用）；
+   - 竖排 → **vcol 竖排专用服务**（aiBox:8785，工具 `ocr_vertical`，图片输入）：
+     整列识别 + 右起阅读序 + 标点恢复 + 逐字 y + `dark_bg`（黑底白字，如页码，自动反色）
+     + `□` 占位（有墨迹未识别，多为标点）。一次性 streamable HTTP 客户端、
+     **一个会话循环逐页**（勿每页起一次 MCP 工具调用），实测 0.2–1.3s/页、
+     286 页 ≈ 6 分钟。渲染 dpi：大页（~768pt 宽）150dpi、小字小页（~280pt 宽）
+     300dpi（字高 <14px 时 □ 显著增多；先单页 A/B 试 dpi 再批量）。
+     返回的 `quad` + `chars.yc` 可换算 special JSON 的 `vertical_columns` 几何
+     （见"竖排文字/扉页特判"节）。
+   - 8775（paddleocr_mcp + `ocr_vert.yaml` 竖排调参流水线，接口同 8765）：
+     只需整本粗读、不要求列序/标点/页码时的单调用替代；精排用 vcol。
+3. **插图里的对话框/对话气泡默认不做 OCR**：speech bubble 内的文字默认不建
+   文字层（S3 二值化插图原样保留，信息不丢）；文字层只管插图框外的字幕/
+   正文行。例外：用户明确要台词，或气泡位于插图框外。
+4. **置信度分流**：
+   - 高置信（本流程 score≥0.62；simple 尾行 >~90%；vcol 列 score≥0.7 且无 □）→ 直接用；
+   - 低置信/乱码行 → 先走 S4 救援配方；
+   - 救援仍失败 → **视觉模型目读**：渲染源图 ≥2x（长边 ≤2000px）交视觉模型
+     读出乱码区回填，标 `rescued: "vision-read"`；
+   - 目读不稳 → 人工校对（`rescued: "manual-proofread"`）。系统性误字
+     （如 哪吒→哪旺猴）确认后可全书批量替换。
 
 脚本都在本技能 `scripts/` 下，`<out>` 目录经 `--out` 传入；运行示例：
 
@@ -216,8 +245,10 @@ $PY $SK/scripts/test_page.py     --src book.pdf --out digitize --compare 2,5,50
 3. **整行丢失**：条带 det 漏检整行（不只首末行，中段也漏）→ 逐行救援或
    全书条带兜底重识别（见 S4.5）抓出，人工回填。
 - **密集网点页判据**：逐行救援后仍反复乱码/score<0.6（p191 实测）→
-  **停止自动救援，转人工逐行对照源图校对**，行文本手填并标
-  `rescued: "manual-proofread"`。不要无脑再试新配方。
+  **停止自动救援**：先试**视觉模型目读**（渲染源图 ≥2x，长边 ≤2000px，
+  视觉模型读出乱码区回填，标 `rescued: "vision-read"`）；目读不稳再转人工
+  逐行对照源图校对，行文本手填并标 `rescued: "manual-proofread"`。
+  不要无脑再试新配方。
 
 ## S4.5 全书条带兜底检查（strip_check.py 配方）
 
@@ -438,6 +469,11 @@ OCR 把表格拆成单元格框（每格一个 quad）。Scribus 路线重建：
 
 ## 竖排文字 / 扉页特判（本项目 p2 配方）
 
+0. **有 aiBox 时首选 vcol 竖排专用服务**（8785 `ocr_vertical`，见"混排书籍
+   分治路由"节）：整列识别/右起阅读序/标点/逐字 y/dark_bg 页码一步到位，
+   无需旋转坐标换算；下列 90° 旋转配方作为 vcol 不可用（服务未起/非 aiBox
+   环境）时的回退路线。
+
 1. 页面旋转 90° CW（`cv2.rotate ROTATE_90_CLOCKWISE`）→ 竖排变横排 →
    MCP OCR。原图 (x,y) → 旋转 (x',y')：`x'=H-1-y, y'=x`；
    逆变换 `x=y', y=H-1-x'`。
@@ -566,6 +602,8 @@ OCR 把表格拆成单元格框（每格一个 quad）。Scribus 路线重建：
   openvino paddleocr-mcp`（server 本体）。pip 用国内镜像（TUNA）。
 - iGPU 加速：`ocr_openvino.yaml`（PP-OCRv6 medium det/rec + OV GPU）
   ~8-12s/页；CPU `ocr_cpu.yaml` 单页救援 ~5s、整页 ~30-60s。
+- vcol 竖排专用（aiBox:8785 streamable HTTP，venv 的 mcp 客户端直调）：
+  0.2–1.3s/页（150–300dpi），见"混排书籍分治路由"节与 mcp-setup.md §7。
 - 模型缓存 `~/.paddlex/official_models/`（PP-OCRv6_medium_det/rec、
   PP-LCNet_x1_0_*、UVDoc、PP-DocLayout_plus-L_onnx）。
 
